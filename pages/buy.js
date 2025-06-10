@@ -1,115 +1,100 @@
 // pages/buy.js
 
-import { useEffect, useState } from 'react';
-import { getSession } from 'next-auth/react';
-import { getServices, createOrder } from '@/lib/apiclient';
-import { useRouter } from 'next/router';
-import Head from 'next/head';
+import { useEffect, useState } from "react";
+import axios from "axios";
 
-export async function getServerSideProps(context) {
-  const session = await getSession(context);
+export default function BuyPage() {
+  const [services, setServices] = useState([]);
+  const [selectedService, setSelectedService] = useState(null);
+  const [link, setLink] = useState("");
+  const [quantity, setQuantity] = useState(100);
+  const [message, setMessage] = useState("");
 
-  if (!session) {
-    return {
-      redirect: {
-        destination: '/login',
-        permanent: false
+  // Fetch services from your real API
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const res = await axios.get("/api/services");
+        setServices(res.data);
+      } catch (error) {
+        console.error("Failed to fetch services", error);
       }
     };
-  }
 
-  const services = await getServices();
-
-  return {
-    props: {
-      session,
-      services
-    }
-  };
-}
-
-export default function BuyPage({ session, services }) {
-  const [selected, setSelected] = useState('');
-  const [link, setLink] = useState('');
-  const [quantity, setQuantity] = useState(100);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const router = useRouter();
+    fetchServices();
+  }, []);
 
   const handleOrder = async () => {
-    setLoading(true);
-    setMessage('');
+    if (!selectedService || !link || !quantity) {
+      setMessage("Please fill all fields.");
+      return;
+    }
+
     try {
-      const res = await createOrder({
-        service: selected,
+      const res = await axios.post("/api/order", {
+        service: selectedService,
         link,
-        quantity
+        quantity,
       });
 
-      if (res.order) {
-        setMessage(`✅ Order Placed! ID: ${res.order}`);
-        router.push('/dashboard');
+      if (res.data.success) {
+        setMessage("Order placed successfully!");
       } else {
-        setMessage(`❌ Error: ${res.error || 'Failed'}`);
+        setMessage("Order failed: " + res.data.message);
       }
     } catch (err) {
-      setMessage(`❌ Error: ${err.message}`);
-    } finally {
-      setLoading(false);
+      console.error(err);
+      setMessage("An error occurred.");
     }
   };
 
   return (
-    <>
-      <Head>
-        <title>Buy Services - Amna Rajpoot SmmPannel</title>
-      </Head>
+    <div className="max-w-2xl mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-4">Buy Service</h1>
 
-      <div className="max-w-2xl mx-auto mt-10 p-6 bg-white rounded-2xl shadow-lg space-y-4">
-        <h1 className="text-2xl font-bold text-center">Buy SMM Services</h1>
-
+      <div className="mb-4">
+        <label className="block font-medium">Select Service</label>
         <select
-          className="w-full p-3 border rounded"
-          value={selected}
-          onChange={(e) => setSelected(e.target.value)}
+          className="w-full p-2 border rounded"
+          onChange={(e) => setSelectedService(e.target.value)}
         >
-          <option value="">-- Select Service --</option>
-          {services.map((s) => (
-            <option key={s.service} value={s.service}>
-              {s.name} — Rs. {s.price_with_profit}
+          <option value="">-- Select a Service --</option>
+          {services.map((service) => (
+            <option key={service.service} value={service.service}>
+              {service.name} - PKR {service.price + 20}
             </option>
           ))}
         </select>
+      </div>
 
+      <div className="mb-4">
+        <label className="block font-medium">Enter Link</label>
         <input
           type="text"
-          placeholder="Enter link (e.g., Instagram post)"
-          className="w-full p-3 border rounded"
+          className="w-full p-2 border rounded"
           value={link}
           onChange={(e) => setLink(e.target.value)}
         />
+      </div>
 
+      <div className="mb-4">
+        <label className="block font-medium">Quantity</label>
         <input
           type="number"
-          placeholder="Quantity"
-          className="w-full p-3 border rounded"
+          className="w-full p-2 border rounded"
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
-          min={10}
         />
-
-        <button
-          onClick={handleOrder}
-          disabled={loading}
-          className="w-full bg-black text-white py-3 rounded hover:bg-gray-800"
-        >
-          {loading ? 'Placing Order...' : 'Buy Now'}
-        </button>
-
-        {message && (
-          <p className="text-center font-medium text-sm text-red-500">{message}</p>
-        )}
       </div>
-    </>
+
+      <button
+        className="bg-blue-600 text-white px-4 py-2 rounded"
+        onClick={handleOrder}
+      >
+        Place Order
+      </button>
+
+      {message && <p className="mt-4 text-red-600">{message}</p>}
+    </div>
   );
-}
+      }
